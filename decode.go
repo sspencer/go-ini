@@ -78,10 +78,19 @@ func generateMap(m map[string]sectionTag, v reflect.Value) {
 
 			st := sectionTag{tag, false, f, make(map[string]sectionTag)}
 
-			m[tag] = st
+			// some structures are just for organizing data
+			if tag != "-" {
+				m[tag] = st
+			}
 
 			if f.Type().Kind() == reflect.Struct {
-				generateMap(st.children, f)
+				if tag == "-" {
+					generateMap(m, f)
+				} else {
+					// little namespacing here so property names can
+					// be the same under different sections
+					generateMap(st.children, f)
+				}
 			}
 		}
 	} else {
@@ -96,7 +105,7 @@ func (d *decodeState) unmarshal(x interface{}) error {
 
 	generateMap(parentMap, reflect.ValueOf(x))
 
-	//log.Printf("%v\n", parentMap)
+	//log.Printf("%#v\n", parentMap)
 
 	var parentSection sectionTag
 	var hasParent bool = false
