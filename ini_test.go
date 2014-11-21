@@ -67,3 +67,95 @@ MYBOOL=yes`)
 	}
 
 }
+
+func TestNoSections(t *testing.T) {
+
+	var d struct {
+		Title   string
+		Version string
+	}
+
+	b := []byte(`
+TITLE=Go Compiler
+VERSION=1.3.3
+`)
+
+	err := Unmarshal(b, &d)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if d.Title != "Go Compiler" {
+		t.Fatal("Field Title not set")
+	} else if d.Version != "1.3.3" {
+		t.Fatal("Field Version not set")
+	}
+}
+
+func TestTwoSections(t *testing.T) {
+
+	var d struct {
+		Mysql struct {
+			Host string
+		} `ini:"[MYSQL]"`
+
+		PdoMysql struct {
+			Host string
+		} `ini:"[PDOMYSQL]"`
+	}
+
+	b := []byte(`
+[MYSQL]
+HOST=mysql:localhost
+
+[PDOMYSQL]
+HOST=pdo:127.0.0.1
+`)
+
+	err := Unmarshal(b, &d)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if d.Mysql.Host != "mysql:localhost" {
+		t.Fatal("Field Mysql Host not set")
+	} else if d.PdoMysql.Host != "pdo:127.0.0.1" {
+		t.Fatal("Field Pdo Host not set")
+	}
+}
+
+func TestMixed(t *testing.T) {
+
+	var d struct {
+		Title   string
+		Version string
+		Mysql   struct {
+			Host string
+		} `ini:"[MYSQL]"`
+	}
+
+	b := []byte(`
+TITLE=Go Compiler
+VERSION=1.3.3
+
+[MYSQL]
+HOST=localhost
+`)
+
+	err := Unmarshal(b, &d)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if d.Title != "Go Compiler" {
+		t.Fatal("Field Title not set")
+	} else if d.Version != "1.3.3" {
+		t.Fatal("Field Version not set")
+	} else if d.Mysql.Host != "localhost" {
+		t.Fatal("Field Host not set")
+	}
+
+}
