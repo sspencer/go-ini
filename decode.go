@@ -4,7 +4,7 @@ package ini
 import (
 	"bufio"
 	"bytes"
-
+	"fmt"
 	"log"
 	"reflect"
 	"strings"
@@ -64,23 +64,16 @@ func generateMap(m map[string]sectionTag, v reflect.Value) {
 			sf := typ.Field(i)
 			f := v.Field(i)
 
-			var st sectionTag = sectionTag{false, f, nil}
+			st := sectionTag{false, f, make(map[string]sectionTag)}
 
-			log.Println("==== IN ", sf.Tag.Get("ini"))
 			m[sf.Tag.Get("ini")] = st
 
 			if f.Type().Kind() == reflect.Struct {
-				log.Println("    STRUCT")
-				st.children = make(map[string]sectionTag)
 				generateMap(st.children, f)
 			}
-
-			log.Println(m)
-			log.Println("==== OUT ", sf.Tag.Get("ini"))
 		}
 	} else {
-		log.Println("Unhandled type:", v.Kind())
-		panic("Don't handle this type yet!")
+		panic(fmt.Sprintf("Don't handle this type yet: %s", v.Kind()))
 	}
 
 }
@@ -94,9 +87,6 @@ func (d *decodeState) unmarshal(x interface{}) error {
 	var parentSection sectionTag
 	var hasParent bool = false
 
-	log.Println("-----")
-	log.Println(parentMap)
-	log.Println("-----")
 	for d.scanner.Scan() {
 		line := strings.TrimSpace(d.scanner.Text())
 		log.Printf("Scanned (%d): %s\n", d.lineNum, line)
@@ -109,20 +99,18 @@ func (d *decodeState) unmarshal(x interface{}) error {
 		if line[0] == '[' && line[len(line)-1] == ']' {
 			log.Println("IN PARENT")
 			parentSection, hasParent = parentMap[line]
-			log.Println(parentSection)
+			//log.Println(parentSection)
 			continue
 		}
 
 		if hasParent {
 			matches := strings.SplitN(line, "=", 2)
-			log.Printf("MATCHES %q\n", matches)
+
 			if len(matches) == 2 {
-				childSection, hasChild := parentSection.children[matches[0]]
+				prop := strings.TrimSpace(matches[0])
+				childSection, hasChild := parentSection.children[prop]
 				if hasChild {
-					log.Println("HAS Child", childSection)
-				} else {
-					log.Println("NO NO NO")
-					log.Println(parentSection.children)
+					log.Println("**** Matches", matches[0], " ::: ", childSection)
 				}
 			}
 		}
