@@ -28,9 +28,14 @@ type decodeState struct {
 }
 
 type sectionTag struct {
+	tag      string
 	wildcard bool
 	value    reflect.Value
 	children map[string]sectionTag
+}
+
+func (t sectionTag) String() string {
+	return fmt.Sprintf("<section %s>", t.tag)
 }
 
 func (d *decodeState) init(data []byte) *decodeState {
@@ -65,13 +70,13 @@ func generateMap(m map[string]sectionTag, v reflect.Value) {
 			sf := typ.Field(i)
 			f := v.Field(i)
 
-			st := sectionTag{false, f, make(map[string]sectionTag)}
-
 			tag := sf.Tag.Get("ini")
 			if len(tag) == 0 {
 				tag = sf.Name
 			}
 			tag = strings.TrimSpace(strings.ToLower(tag))
+
+			st := sectionTag{tag, false, f, make(map[string]sectionTag)}
 
 			m[tag] = st
 
@@ -91,6 +96,8 @@ func (d *decodeState) unmarshal(x interface{}) error {
 
 	generateMap(parentMap, reflect.ValueOf(x))
 
+	//log.Printf("%v\n", parentMap)
+
 	var parentSection sectionTag
 	var hasParent bool = false
 
@@ -105,23 +112,29 @@ func (d *decodeState) unmarshal(x interface{}) error {
 
 		if line[0] == '[' && line[len(line)-1] == ']' {
 			parentSection, hasParent = parentMap[strings.ToLower(line)]
+
 			continue
 		}
 
-		if hasParent {
-			matches := strings.SplitN(line, "=", 2)
+		matches := strings.SplitN(line, "=", 2)
 
-			if len(matches) == 2 {
-				n := strings.ToLower(strings.TrimSpace(matches[0]))
-				s := strings.TrimSpace(matches[1])
+		if len(matches) == 2 {
+			n := strings.ToLower(strings.TrimSpace(matches[0]))
+			s := strings.TrimSpace(matches[1])
+
+			if hasParent {
 
 				childSection, hasChild := parentSection.children[n]
 				if hasChild {
 					setValue(childSection.value, s, d.lineNum)
 				} // else look for wildcard??
+			} else {
+				propSection, hasProp := parentMap[n]
+				if hasProp {
+					setValue(propSection.value, s, d.lineNum)
+				}
 			}
-		} else {
-			log.Println("Look for top level Property")
+
 		}
 	}
 
