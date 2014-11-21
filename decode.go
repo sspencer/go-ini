@@ -67,7 +67,13 @@ func generateMap(m map[string]sectionTag, v reflect.Value) {
 
 			st := sectionTag{false, f, make(map[string]sectionTag)}
 
-			m[sf.Tag.Get("ini")] = st
+			tag := sf.Tag.Get("ini")
+			if len(tag) == 0 {
+				tag = sf.Name
+			}
+			tag = strings.TrimSpace(strings.ToLower(tag))
+
+			m[tag] = st
 
 			if f.Type().Kind() == reflect.Struct {
 				generateMap(st.children, f)
@@ -98,7 +104,7 @@ func (d *decodeState) unmarshal(x interface{}) error {
 		}
 
 		if line[0] == '[' && line[len(line)-1] == ']' {
-			parentSection, hasParent = parentMap[line]
+			parentSection, hasParent = parentMap[strings.ToLower(line)]
 			continue
 		}
 
@@ -106,14 +112,12 @@ func (d *decodeState) unmarshal(x interface{}) error {
 			matches := strings.SplitN(line, "=", 2)
 
 			if len(matches) == 2 {
-				prop := strings.TrimSpace(matches[0])
-				data := strings.TrimSpace(matches[1])
+				n := strings.ToLower(strings.TrimSpace(matches[0]))
+				s := strings.TrimSpace(matches[1])
 
-				childSection, hasChild := parentSection.children[prop]
+				childSection, hasChild := parentSection.children[n]
 				if hasChild {
-					// set value
-					//log.Println("**** Matches", matches[0], " ::: ", childSection)
-					setValue(childSection.value, data, d.lineNum)
+					setValue(childSection.value, s, d.lineNum)
 				} // else look for wildcard??
 			}
 		} else {
@@ -124,9 +128,12 @@ func (d *decodeState) unmarshal(x interface{}) error {
 	return nil
 }
 
+// Set Value with given string
 func setValue(v reflect.Value, s string, lineNum int) {
 	log.Printf("SET(%s, %s)", v.Kind(), s)
+
 	switch v.Kind() {
+
 	case reflect.String:
 		v.SetString(s)
 
@@ -136,21 +143,21 @@ func setValue(v reflect.Value, s string, lineNum int) {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		n, err := strconv.ParseInt(s, 10, 64)
 		if err != nil || v.OverflowInt(n) {
-			panic(fmt.Sprintf("Invalid number '%s' specified on line %d", s, lineNum))
+			panic(fmt.Sprintf("Invalid int '%s' specified on line %d", s, lineNum))
 		}
 		v.SetInt(n)
 
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
 		n, err := strconv.ParseUint(s, 10, 64)
 		if err != nil || v.OverflowUint(n) {
-			panic(fmt.Sprintf("Invalid number '%s' specified on line %d", s, lineNum))
+			panic(fmt.Sprintf("Invalid uint '%s' specified on line %d", s, lineNum))
 		}
 		v.SetUint(n)
 
 	case reflect.Float32, reflect.Float64:
 		n, err := strconv.ParseFloat(s, v.Type().Bits())
 		if err != nil || v.OverflowFloat(n) {
-			panic(fmt.Sprintf("Invalid number '%s' specified on line %d", s, lineNum))
+			panic(fmt.Sprintf("Invalid float '%s' specified on line %d", s, lineNum))
 		}
 		v.SetFloat(n)
 
@@ -160,6 +167,7 @@ func setValue(v reflect.Value, s string, lineNum int) {
 
 }
 
+// Returns true for truthy values like t/true/y/yes/1, false otherwise
 func getBoolValue(s string) bool {
 	v := false
 	switch strings.ToLower(s) {

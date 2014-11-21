@@ -37,7 +37,7 @@ func TestScalar(t *testing.T) {
 	var d struct {
 		Start struct {
 			MyString string  `ini:"MYSTRING"`
-			MyInt    int     `ini:"MYINT"`
+			MyInt    int     // ini tag not required if name is same (case ignored)
 			MyFloat  float64 `ini:"MYFLOAT"`
 			MyBool   bool    `ini:"MYBOOL"`
 		} `ini:"[START]"`
