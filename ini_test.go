@@ -1,6 +1,7 @@
 package ini
 
 import (
+	"log"
 	"testing"
 )
 
@@ -198,5 +199,43 @@ SET OPTION NETWORK ID=53
 		t.Fatal("DownloadStart does not match")
 	} else if d.Download.DownloadEnd != "23:59:00" {
 		t.Fatal("DownloadEnd does not match")
+	}
+}
+
+func TestArray1(t *testing.T) {
+	var d struct {
+		Playlist struct {
+			Id    int
+			Title string
+			Songs []int `ini:"Add Song"`
+		} `ini:"[CREATE PLAYLIST]"`
+	}
+
+	b := []byte(`
+[CREATE PLAYLIST]
+ID=349
+Title=Rock & Roll, D00d
+Add Song=71
+Add Song=136
+Add Song=252`)
+
+	err := Unmarshal(b, &d)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if d.Playlist.Id != 349 {
+		t.Fatal("Playlist Id not set")
+	} else if d.Playlist.Title != "Rock & Roll, D00d" {
+		t.Fatal("Playlist Title not set")
+	} else if len(d.Playlist.Songs) != 3 {
+		t.Fatal("Playlist Songs length is incorrect")
+	} else if d.Playlist.Songs[0] != 71 {
+		t.Fatal("Playlist Songs[0] is incorrect")
+	} else if d.Playlist.Songs[1] != 136 {
+		t.Fatal("Playlist Songs[1] is incorrect")
+	} else if d.Playlist.Songs[2] != 252 {
+		t.Fatal("Playlist Songs[2] is incorrect")
 	}
 }

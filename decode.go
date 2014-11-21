@@ -29,7 +29,6 @@ type decodeState struct {
 
 type sectionTag struct {
 	tag      string
-	wildcard bool
 	value    reflect.Value
 	children map[string]sectionTag
 }
@@ -76,7 +75,7 @@ func generateMap(m map[string]sectionTag, v reflect.Value) {
 			}
 			tag = strings.TrimSpace(strings.ToLower(tag))
 
-			st := sectionTag{tag, false, f, make(map[string]sectionTag)}
+			st := sectionTag{tag, f, make(map[string]sectionTag)}
 
 			// some structures are just for organizing data
 			if tag != "-" {
@@ -182,6 +181,17 @@ func setValue(v reflect.Value, s string, lineNum int) {
 			panic(fmt.Sprintf("Invalid float '%s' specified on line %d", s, lineNum))
 		}
 		v.SetFloat(n)
+
+	case reflect.Slice:
+		n, err := strconv.ParseInt(s, 10, 64)
+		if err != nil {
+			panic(fmt.Sprintf("Invalid int '%s' specified on line %d", s, lineNum))
+		}
+
+		n1 := reflect.ValueOf(n)
+		n2 := n1.Convert(v.Type().Elem())
+
+		v.Set(reflect.Append(v, n2))
 
 	default:
 		log.Println("Can't set that kind yet!")
