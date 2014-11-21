@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"reflect"
+	"strconv"
 	"strings"
 )
 
@@ -97,9 +98,7 @@ func (d *decodeState) unmarshal(x interface{}) error {
 		}
 
 		if line[0] == '[' && line[len(line)-1] == ']' {
-			log.Println("IN PARENT")
 			parentSection, hasParent = parentMap[line]
-			//log.Println(parentSection)
 			continue
 		}
 
@@ -108,15 +107,67 @@ func (d *decodeState) unmarshal(x interface{}) error {
 
 			if len(matches) == 2 {
 				prop := strings.TrimSpace(matches[0])
+				data := strings.TrimSpace(matches[1])
+
 				childSection, hasChild := parentSection.children[prop]
 				if hasChild {
-					log.Println("**** Matches", matches[0], " ::: ", childSection)
-				}
+					// set value
+					//log.Println("**** Matches", matches[0], " ::: ", childSection)
+					setValue(childSection.value, data, d.lineNum)
+				} // else look for wildcard??
 			}
+		} else {
+			log.Println("Look for top level Property")
 		}
 	}
 
 	return nil
+}
+
+func setValue(v reflect.Value, s string, lineNum int) {
+	log.Printf("SET(%s, %s)", v.Kind(), s)
+	switch v.Kind() {
+	case reflect.String:
+		v.SetString(s)
+
+	case reflect.Bool:
+		v.SetBool(getBoolValue(s))
+
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		n, err := strconv.ParseInt(s, 10, 64)
+		if err != nil || v.OverflowInt(n) {
+			panic(fmt.Sprintf("Invalid number '%s' specified on line %d", s, lineNum))
+		}
+		v.SetInt(n)
+
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+		n, err := strconv.ParseUint(s, 10, 64)
+		if err != nil || v.OverflowUint(n) {
+			panic(fmt.Sprintf("Invalid number '%s' specified on line %d", s, lineNum))
+		}
+		v.SetUint(n)
+
+	case reflect.Float32, reflect.Float64:
+		n, err := strconv.ParseFloat(s, v.Type().Bits())
+		if err != nil || v.OverflowFloat(n) {
+			panic(fmt.Sprintf("Invalid number '%s' specified on line %d", s, lineNum))
+		}
+		v.SetFloat(n)
+
+	default:
+		log.Println("Can't set that kind yet!")
+	}
+
+}
+
+func getBoolValue(s string) bool {
+	v := false
+	switch strings.ToLower(s) {
+	case "t", "true", "y", "yes", "1":
+		v = true
+	}
+
+	return v
 }
 
 /*

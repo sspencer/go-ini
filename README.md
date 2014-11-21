@@ -33,7 +33,7 @@ With code like this:
     err := ini.Unmarshal(b, &config)
 
 
-Current Status: NOT READY!
+Current Status
 ==============
 
-Just started and in active development, doesn't decode yet.
+Structs with scalar values in [SECTIONS] now parsed.
