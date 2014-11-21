@@ -4,7 +4,9 @@ package ini
 import (
 	"bufio"
 	"bytes"
+
 	"log"
+	"reflect"
 	"strings"
 )
 
@@ -18,9 +20,16 @@ func Unmarshal(data []byte, v interface{}) error {
 
 // decodeState represents the state while decoding a INI value.
 type decodeState struct {
-	lineNum    int
-	scanner    *bufio.Scanner
-	savedError error
+	currentPath string
+	lineNum     int
+	scanner     *bufio.Scanner
+	savedError  error
+}
+
+type sectionTag struct {
+	wildcard bool
+	value    reflect.Value
+	children map[string]sectionTag
 }
 
 func (d *decodeState) init(data []byte) *decodeState {
@@ -44,7 +53,50 @@ func (d *decodeState) saveError(err error) {
 	}
 }
 
-func (d *decodeState) unmarshal(interface{}) error {
+func generateMap(m map[string]sectionTag, v reflect.Value) {
+
+	if v.Type().Kind() == reflect.Ptr {
+		generateMap(m, v.Elem())
+	} else if v.Kind() == reflect.Struct {
+		typ := v.Type()
+		for i := 0; i < typ.NumField(); i++ {
+
+			sf := typ.Field(i)
+			f := v.Field(i)
+
+			var st sectionTag = sectionTag{false, f, nil}
+
+			log.Println("==== IN ", sf.Tag.Get("ini"))
+			m[sf.Tag.Get("ini")] = st
+
+			if f.Type().Kind() == reflect.Struct {
+				log.Println("    STRUCT")
+				st.children = make(map[string]sectionTag)
+				generateMap(st.children, f)
+			}
+
+			log.Println(m)
+			log.Println("==== OUT ", sf.Tag.Get("ini"))
+		}
+	} else {
+		log.Println("Unhandled type:", v.Kind())
+		panic("Don't handle this type yet!")
+	}
+
+}
+
+func (d *decodeState) unmarshal(x interface{}) error {
+
+	var parentMap map[string]sectionTag = make(map[string]sectionTag)
+
+	generateMap(parentMap, reflect.ValueOf(x))
+
+	var parentSection sectionTag
+	var hasParent bool = false
+
+	log.Println("-----")
+	log.Println(parentMap)
+	log.Println("-----")
 	for d.scanner.Scan() {
 		line := strings.TrimSpace(d.scanner.Text())
 		log.Printf("Scanned (%d): %s\n", d.lineNum, line)
@@ -54,6 +106,26 @@ func (d *decodeState) unmarshal(interface{}) error {
 			continue // skip comments
 		}
 
+		if line[0] == '[' && line[len(line)-1] == ']' {
+			log.Println("IN PARENT")
+			parentSection, hasParent = parentMap[line]
+			log.Println(parentSection)
+			continue
+		}
+
+		if hasParent {
+			matches := strings.SplitN(line, "=", 2)
+			log.Printf("MATCHES %q\n", matches)
+			if len(matches) == 2 {
+				childSection, hasChild := parentSection.children[matches[0]]
+				if hasChild {
+					log.Println("HAS Child", childSection)
+				} else {
+					log.Println("NO NO NO")
+					log.Println(parentSection.children)
+				}
+			}
+		}
 	}
 
 	return nil
