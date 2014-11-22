@@ -183,6 +183,8 @@ func setValue(v reflect.Value, s string, lineNum int) {
 		v.SetFloat(n)
 
 	case reflect.Slice:
+
+		// Hardcoding of []int temporarily
 		n, err := strconv.ParseInt(s, 10, 64)
 		if err != nil {
 			panic(fmt.Sprintf("Invalid int '%s' specified on line %d", s, lineNum))
