@@ -21,10 +21,11 @@ func Unmarshal(data []byte, v interface{}) error {
 
 // decodeState represents the state while decoding a INI value.
 type decodeState struct {
-	currentPath string
-	lineNum     int
-	scanner     *bufio.Scanner
-	savedError  error
+	currentPath    string
+	lineNum        int
+	scanner        *bufio.Scanner
+	savedError     error
+	unmatchedLines []string
 }
 
 type sectionTag struct {
@@ -42,6 +43,7 @@ func (d *decodeState) init(data []byte) *decodeState {
 	d.lineNum = 1
 	d.scanner = bufio.NewScanner(bytes.NewReader(data))
 	d.savedError = nil
+
 	return d
 }
 
@@ -125,7 +127,7 @@ func (d *decodeState) unmarshal(x interface{}) error {
 		}
 
 		matches := strings.SplitN(line, "=", 2)
-
+		matched := false
 		if len(matches) == 2 {
 			n := strings.ToLower(strings.TrimSpace(matches[0]))
 			s := strings.TrimSpace(matches[1])
@@ -135,14 +137,27 @@ func (d *decodeState) unmarshal(x interface{}) error {
 				childSection, hasChild := parentSection.children[n]
 				if hasChild {
 					setValue(childSection.value, s, d.lineNum)
+					matched = true
 				} // else look for wildcard??
 			} else {
 				propSection, hasProp := parentMap[n]
 				if hasProp {
 					setValue(propSection.value, s, d.lineNum)
+					matched = true
 				}
 			}
+		}
 
+		if !matched {
+			d.unmatchedLines = append(d.unmatchedLines, line)
+		}
+	}
+
+	// temp - print out unmatch lines to verify they're being kept
+	if len(d.unmatchedLines) > 0 {
+		log.Println("==== Unmatched Lines ====")
+		for _, line := range d.unmatchedLines {
+			log.Println("    ", line)
 		}
 	}
 
@@ -213,9 +228,9 @@ func getBoolValue(s string) bool {
 }
 
 /*
-// A Decoder reads and decodes JSON objects from an input stream.
+// A Decoder reads and decodes INI object from an input stream.
 type Decoder struct {
-	d    decodeState
+	d decodeState
 }
 
 // NewDecoder returns a new decoder that reads from r.
@@ -226,19 +241,13 @@ func NewDecoder(r io.Reader) *Decoder {
 	return &Decoder{r: r}
 }
 
-// Decode reads the next JSON-encoded value from its
-// input and stores it in the value pointed to by v.
+// Decode reads the INI file and stores it in the value pointed to by v.
 //
 // See the documentation for Unmarshal for details about
-// the conversion of JSON into a Go value.
+// the conversion of an INI into a Go value.
 func (dec *Decoder) Decode(v interface{}) error {
 	if dec.err != nil {
 		return dec.err
-	}
-
-	n, err := dec.readValue()
-	if err != nil {
-		return err
 	}
 
 	// Don't save err from unmarshal into dec.err:

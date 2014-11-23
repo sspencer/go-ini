@@ -1,7 +1,7 @@
 package ini
 
 import (
-	"log"
+	//	"log"
 	"testing"
 )
 
@@ -200,6 +200,37 @@ SET OPTION NETWORK ID=53
 	} else if d.Download.DownloadEnd != "23:59:00" {
 		t.Fatal("DownloadEnd does not match")
 	}
+}
+
+func TestUnmatched(t *testing.T) {
+	var d struct {
+		Start struct {
+			Foo  string `ini:"FOO"`
+			Host string
+		} `ini:"[START]"`
+	}
+
+	b := []byte(`
+; ignore me
+[START]
+FOO=BAR
+SOMETHING=OTHER
+OTHER=NOT
+HOST=192.168.1.10
+`)
+
+	err := Unmarshal(b, &d)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if d.Start.Foo != "BAR" {
+		t.Fatal("Field FOO not set")
+	}
+
+	// need to add NewDecoder to have indirection access
+	// to decode state to query unmatched lines ... TBD
 }
 
 func TestArray1(t *testing.T) {
