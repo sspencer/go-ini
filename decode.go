@@ -244,6 +244,17 @@ func sliceValue(v reflect.Value, s string, lineNum int) {
 
 		v.Set(reflect.Append(v, n2))
 
+	case reflect.Float32, reflect.Float64:
+		n, err := strconv.ParseFloat(s, 10, 64)
+		if err != nil {
+			panic(fmt.Sprintf("Invalid float '%s' specified on line %d", s, lineNum))
+		}
+
+		n1 := reflect.ValueOf(n)
+		n2 := n1.Convert(v.Type().Elem())
+
+		v.Set(reflect.Append(v, n2))
+
 	default:
 		log.Println("Random Shit!")
 

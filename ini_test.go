@@ -268,13 +268,14 @@ HOST=192.168.1.10
 	// to decode state to query unmatched lines ... TBD
 }
 
-func TestArrayInt(t *testing.T) {
+func TestArrayNumber(t *testing.T) {
 	var d struct {
 		Playlist struct {
-			Id     int
-			Title  string
-			Songs  []int  `ini:"Add Song"`
-			Genres []uint `ini:"Add Genre"`
+			Id      int
+			Title   string
+			Songs   []int     `ini:"Add Song"`
+			Genres  []uint    `ini:"Add Genre"`
+			Volumes []float32 `ini:"Add Volume"`
 		} `ini:"[CREATE PLAYLIST]"`
 	}
 
@@ -287,7 +288,9 @@ Add Song=136
 Add Song=252
 Add Genre=17
 Add Genre=31
-Add Genre=43`)
+Add Genre=43
+Add Volume=0.75
+Add Volume=0.81`)
 
 	err := Unmarshal(b, &d)
 
@@ -315,6 +318,12 @@ Add Genre=43`)
 		t.Fatal("Playlist Genre[1] is incorrect")
 	} else if d.Playlist.Genres[2] != 43 {
 		t.Fatal("Playlist Genre[2] is incorrect")
+	} else if len(d.Playlist.Volumes) != 2 {
+		t.Fatal("Playlist Volume length is incorrect")
+	} else if d.Playlist.Volumes[0] != 0.75 {
+		t.Fatal("Playlist Volume[0] is incorrect")
+	} else if d.Playlist.Volumes[1] != 0.81 {
+		t.Fatal("Playlist Volume[1] is incorrect")
 	}
 }
 
