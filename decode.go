@@ -21,13 +21,22 @@ func Unmarshal(data []byte, v interface{}) error {
 	return d.unmarshal(v)
 }
 
+type Unmatched struct {
+	lineNum int
+	line    string
+}
+
+func (u Unmatched) String() string {
+	return fmt.Sprintf("%d %s", u.lineNum, u.line)
+}
+
 // decodeState represents the state while decoding a INI value.
 type decodeState struct {
 	currentPath    string
 	lineNum        int
 	scanner        *bufio.Scanner
 	savedError     error
-	unmatchedLines []string
+	unmatchedLines []Unmatched
 }
 
 type sectionTag struct {
@@ -151,7 +160,7 @@ func (d *decodeState) unmarshal(x interface{}) error {
 		}
 
 		if !matched {
-			d.unmatchedLines = append(d.unmatchedLines, line)
+			d.unmatchedLines = append(d.unmatchedLines, Unmatched{d.lineNum, line})
 		}
 	}
 
@@ -260,4 +269,10 @@ func (dec *Decoder) Decode(v interface{}) error {
 	err := dec.d.unmarshal(v)
 
 	return err
+}
+
+// UnparsedLines returns an array of strings where each string is an
+// unparsed line from the file.
+func (dec *Decoder) Unmatched() []Unmatched {
+	return dec.d.unmatchedLines
 }

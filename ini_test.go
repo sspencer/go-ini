@@ -2,6 +2,7 @@ package ini
 
 import (
 	//	"log"
+	"bytes"
 	"testing"
 )
 
@@ -29,6 +30,40 @@ Magic Number = 42`)
 		t.Fatal("Field FOO not set")
 	} else if d.Start.Magic != 42 {
 		t.Fatal("Field Magic not set")
+	}
+}
+
+func TestNew(t *testing.T) {
+	var d struct {
+		Start struct {
+			Foo   string `ini:"FOO"`
+			Magic int    `ini:"Magic Number"`
+		} `ini:"[START]"`
+	}
+
+	b := []byte(`
+; ignore me
+[START]
+FOO=BAR
+UNMATCHED=ME
+Magic Number = 42`)
+
+	ini := NewDecoder(bytes.NewReader(b))
+	err := ini.Decode(&d)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	unmatched := ini.Unmatched()
+	if d.Start.Foo != "BAR" {
+		t.Fatal("FOO not set")
+	} else if d.Start.Magic != 42 {
+		t.Fatal("Magic not set")
+	} else if len(unmatched) != 1 {
+		t.Fatal("Wrong number of unmatched lines")
+	} else if unmatched[0].line != "UNMATCHED=ME" {
+		t.Fatal("Unmatched line does not match")
 	}
 }
 
