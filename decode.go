@@ -182,7 +182,7 @@ func setValue(v reflect.Value, s string, lineNum int) {
 		v.SetString(s)
 
 	case reflect.Bool:
-		v.SetBool(getBoolValue(s))
+		v.SetBool(boolValue(s))
 
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		n, err := strconv.ParseInt(s, 10, 64)
@@ -207,6 +207,21 @@ func setValue(v reflect.Value, s string, lineNum int) {
 
 	case reflect.Slice:
 
+		sliceValue(v, s, lineNum)
+
+	default:
+		log.Println("Can't set that kind yet!")
+	}
+
+}
+
+func sliceValue(v reflect.Value, s string, lineNum int) {
+
+	switch v.Type().Elem().Kind() {
+	case reflect.String:
+		v.Set(reflect.Append(v, reflect.ValueOf(s)))
+
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		// Hardcoding of []int temporarily
 		n, err := strconv.ParseInt(s, 10, 64)
 		if err != nil {
@@ -219,13 +234,14 @@ func setValue(v reflect.Value, s string, lineNum int) {
 		v.Set(reflect.Append(v, n2))
 
 	default:
-		log.Println("Can't set that kind yet!")
+		log.Println("Random Shit!")
+
 	}
 
 }
 
 // Returns true for truthy values like t/true/y/yes/1, false otherwise
-func getBoolValue(s string) bool {
+func boolValue(s string) bool {
 	v := false
 	switch strings.ToLower(s) {
 	case "t", "true", "y", "yes", "1":

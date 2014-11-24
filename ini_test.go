@@ -268,7 +268,7 @@ HOST=192.168.1.10
 	// to decode state to query unmatched lines ... TBD
 }
 
-func TestArray1(t *testing.T) {
+func TestArrayInt(t *testing.T) {
 	var d struct {
 		Playlist struct {
 			Id    int
@@ -302,6 +302,44 @@ Add Song=252`)
 	} else if d.Playlist.Songs[1] != 136 {
 		t.Fatal("Playlist Songs[1] is incorrect")
 	} else if d.Playlist.Songs[2] != 252 {
+		t.Fatal("Playlist Songs[2] is incorrect")
+	}
+}
+
+func TestArrayString(t *testing.T) {
+	var d struct {
+		Playlist struct {
+			Id    int
+			Title string
+			Songs []string `ini:"Add Song"`
+		} `ini:"[CREATE PLAYLIST]"`
+	}
+
+	b := []byte(`
+[CREATE PLAYLIST]
+ID=349
+Title=Rock & Roll, D00d
+Add Song=Time to Run
+Add Song=W H O K I L L
+Add Song=Mandinka`)
+
+	err := Unmarshal(b, &d)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if d.Playlist.Id != 349 {
+		t.Fatal("Playlist Id not set")
+	} else if d.Playlist.Title != "Rock & Roll, D00d" {
+		t.Fatal("Playlist Title not set")
+	} else if len(d.Playlist.Songs) != 3 {
+		t.Fatal("Playlist Songs length is incorrect")
+	} else if d.Playlist.Songs[0] != "Tim to Run" {
+		t.Fatal("Playlist Songs[0] is incorrect")
+	} else if d.Playlist.Songs[1] != "W H O K I L L" {
+		t.Fatal("Playlist Songs[1] is incorrect")
+	} else if d.Playlist.Songs[2] != "Mandinka" {
 		t.Fatal("Playlist Songs[2] is incorrect")
 	}
 }
