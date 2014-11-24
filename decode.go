@@ -221,6 +221,9 @@ func sliceValue(v reflect.Value, s string, lineNum int) {
 	case reflect.String:
 		v.Set(reflect.Append(v, reflect.ValueOf(s)))
 
+	case reflect.Bool:
+		v.Set(reflect.Append(v, reflect.ValueOf(boolValue(s))))
+
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		// Hardcoding of []int temporarily
 		n, err := strconv.ParseInt(s, 10, 64)
