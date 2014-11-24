@@ -5,6 +5,8 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"log"
 	"reflect"
 	"strconv"
@@ -227,9 +229,9 @@ func getBoolValue(s string) bool {
 	return v
 }
 
-/*
 // A Decoder reads and decodes INI object from an input stream.
 type Decoder struct {
+	r io.Reader
 	d decodeState
 }
 
@@ -246,20 +248,16 @@ func NewDecoder(r io.Reader) *Decoder {
 // See the documentation for Unmarshal for details about
 // the conversion of an INI into a Go value.
 func (dec *Decoder) Decode(v interface{}) error {
-	if dec.err != nil {
-		return dec.err
-	}
 
+	buf, readErr := ioutil.ReadAll(dec.r)
+	if readErr != nil {
+		return readErr
+	}
 	// Don't save err from unmarshal into dec.err:
 	// the connection is still usable since we read a complete JSON
 	// object from it before the error happened.
-	dec.d.init(dec.buf[0:n])
-	err = dec.d.unmarshal(v)
-
-	// Slide rest of data down.
-	rest := copy(dec.buf, dec.buf[n:])
-	dec.buf = dec.buf[0:rest]
+	dec.d.init(buf)
+	err := dec.d.unmarshal(v)
 
 	return err
 }
-*/
