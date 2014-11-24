@@ -271,9 +271,10 @@ HOST=192.168.1.10
 func TestArrayInt(t *testing.T) {
 	var d struct {
 		Playlist struct {
-			Id    int
-			Title string
-			Songs []int `ini:"Add Song"`
+			Id     int
+			Title  string
+			Songs  []int  `ini:"Add Song"`
+			Genres []uint `ini:"Add Genre"`
 		} `ini:"[CREATE PLAYLIST]"`
 	}
 
@@ -283,7 +284,10 @@ ID=349
 Title=Rock & Roll, D00d
 Add Song=71
 Add Song=136
-Add Song=252`)
+Add Song=252
+Add Genre=17
+Add Genre=31
+Add Genre=43`)
 
 	err := Unmarshal(b, &d)
 
@@ -303,6 +307,14 @@ Add Song=252`)
 		t.Fatal("Playlist Songs[1] is incorrect")
 	} else if d.Playlist.Songs[2] != 252 {
 		t.Fatal("Playlist Songs[2] is incorrect")
+	} else if len(d.Playlist.Genres) != 3 {
+		t.Fatal("Playlist Genre length is incorrect")
+	} else if d.Playlist.Genres[0] != 17 {
+		t.Fatal("Playlist Genre[0] is incorrect")
+	} else if d.Playlist.Genres[1] != 31 {
+		t.Fatal("Playlist Genre[1] is incorrect")
+	} else if d.Playlist.Genres[2] != 43 {
+		t.Fatal("Playlist Genre[2] is incorrect")
 	}
 }
 
@@ -335,7 +347,7 @@ Add Song=Mandinka`)
 		t.Fatal("Playlist Title not set")
 	} else if len(d.Playlist.Songs) != 3 {
 		t.Fatal("Playlist Songs length is incorrect")
-	} else if d.Playlist.Songs[0] != "Tim to Run" {
+	} else if d.Playlist.Songs[0] != "Time to Run" {
 		t.Fatal("Playlist Songs[0] is incorrect")
 	} else if d.Playlist.Songs[1] != "W H O K I L L" {
 		t.Fatal("Playlist Songs[1] is incorrect")
