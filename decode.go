@@ -32,11 +32,10 @@ func (u Unmatched) String() string {
 
 // decodeState represents the state while decoding a INI value.
 type decodeState struct {
-	currentPath    string
-	lineNum        int
-	scanner        *bufio.Scanner
-	savedError     error
-	unmatchedLines []Unmatched
+	lineNum    int
+	scanner    *bufio.Scanner
+	savedError error
+	unmatched  []Unmatched
 }
 
 type sectionTag struct {
@@ -160,14 +159,14 @@ func (d *decodeState) unmarshal(x interface{}) error {
 		}
 
 		if !matched {
-			d.unmatchedLines = append(d.unmatchedLines, Unmatched{d.lineNum, line})
+			d.unmatched = append(d.unmatched, Unmatched{d.lineNum, line})
 		}
 	}
 
 	// temp - print out unmatch lines to verify they're being kept
-	if len(d.unmatchedLines) > 0 {
+	if len(d.unmatched) > 0 {
 		log.Println("==== Unmatched Lines ====")
-		for _, line := range d.unmatchedLines {
+		for _, line := range d.unmatched {
 			log.Println("    ", line)
 		}
 	}
@@ -274,5 +273,5 @@ func (dec *Decoder) Decode(v interface{}) error {
 // UnparsedLines returns an array of strings where each string is an
 // unparsed line from the file.
 func (dec *Decoder) Unmatched() []Unmatched {
-	return dec.d.unmatchedLines
+	return dec.d.unmatched
 }
