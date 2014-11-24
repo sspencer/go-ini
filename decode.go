@@ -32,7 +32,6 @@ func (u Unmatched) String() string {
 
 // decodeState represents the state while decoding a INI value.
 type decodeState struct {
-	lineNum    int
 	scanner    *bufio.Scanner
 	savedError error
 	unmatched  []Unmatched
@@ -50,7 +49,6 @@ func (t sectionTag) String() string {
 
 func (d *decodeState) init(data []byte) *decodeState {
 
-	d.lineNum = 1
 	d.scanner = bufio.NewScanner(bytes.NewReader(data))
 	d.savedError = nil
 
@@ -120,11 +118,11 @@ func (d *decodeState) unmarshal(x interface{}) error {
 
 	var parentSection sectionTag
 	var hasParent bool = false
-
+	lineNum := 1
 	for d.scanner.Scan() {
 		line := strings.TrimSpace(d.scanner.Text())
-		log.Printf("Scanned (%d): %s\n", d.lineNum, line)
-		d.lineNum = d.lineNum + 1
+		log.Printf("Scanned (%d): %s\n", lineNum, line)
+		lineNum++
 
 		if len(line) < 1 || line[0] == ';' || line[0] == '#' {
 			continue // skip comments
@@ -146,20 +144,20 @@ func (d *decodeState) unmarshal(x interface{}) error {
 
 				childSection, hasChild := parentSection.children[n]
 				if hasChild {
-					setValue(childSection.value, s, d.lineNum)
+					setValue(childSection.value, s, lineNum)
 					matched = true
 				} // else look for wildcard??
 			} else {
 				propSection, hasProp := parentMap[n]
 				if hasProp {
-					setValue(propSection.value, s, d.lineNum)
+					setValue(propSection.value, s, lineNum)
 					matched = true
 				}
 			}
 		}
 
 		if !matched {
-			d.unmatched = append(d.unmatched, Unmatched{d.lineNum, line})
+			d.unmatched = append(d.unmatched, Unmatched{lineNum, line})
 		}
 	}
 
