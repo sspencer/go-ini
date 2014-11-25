@@ -113,10 +113,10 @@ func (d *decodeState) generateMap(m map[string]sectionTag, v reflect.Value) {
 					//fmt.Printf("Struct tag: %s, type: %s\n", tag, f.Type())
 					d.generateMap(st.children, f)
 				}
-			} /*else if kind == reflect.Slice {
+			} else if kind == reflect.Slice {
 				fmt.Printf("Slice tag: %s, type: %s\n", tag, f.Type().Elem())
 				d.generateMap(st.children, reflect.New(f.Type().Elem()))
-			}*/
+			}
 		}
 	} else {
 		d.saveError(&IniError{d.lineNum, d.line, fmt.Sprintf("Can't map into type %s", v.Kind())})
