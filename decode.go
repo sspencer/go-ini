@@ -37,7 +37,11 @@ type IniError struct {
 
 // conform to Error Interfacer
 func (e *IniError) Error() string {
-	return fmt.Sprintf("%s on line %d: \"%s\"", e.iniError, e.lineNum, e.line)
+	if e.lineNum > 0 {
+		return fmt.Sprintf("%s on line %d: \"%s\"", e.iniError, e.lineNum, e.line)
+	} else {
+		return e.iniError
+	}
 }
 
 // decodeState represents the state while decoding a INI value.
@@ -118,10 +122,7 @@ func (d *decodeState) generateMap(m map[string]sectionTag, v reflect.Value) {
 				d.generateMap(st.children, reflect.New(f.Type().Elem()))
 			}
 		}
-	} else {
-		d.saveError(&IniError{d.lineNum, d.line, fmt.Sprintf("Can't map into type %s", v.Kind())})
 	}
-
 }
 
 func (d *decodeState) unmarshal(x interface{}) error {
