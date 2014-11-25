@@ -37,7 +37,7 @@ type IniError struct {
 
 // conform to Error Interfacer
 func (e *IniError) Error() string {
-	return fmt.Sprintf("%s - %d: %s", e.iniError, e.lineNum, e.line)
+	return fmt.Sprintf("%s on line %d: \"%s\"", e.iniError, e.lineNum, e.line)
 }
 
 // decodeState represents the state while decoding a INI value.
@@ -69,11 +69,6 @@ func (d *decodeState) init(data []byte) *decodeState {
 	d.savedError = nil
 
 	return d
-}
-
-// error aborts the decoding by panicking with err.
-func (d *decodeState) error(err error) {
-	panic(err)
 }
 
 // saveError saves the first err it is called with,
@@ -231,21 +226,24 @@ func (d *decodeState) setValue(v reflect.Value, s string) {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		n, err := strconv.ParseInt(s, 10, 64)
 		if err != nil || v.OverflowInt(n) {
-			panic(fmt.Sprintf("Invalid int '%s' specified on line %d", s, d.lineNum))
+			d.saveError(&IniError{d.lineNum, d.line, "Invalid int"})
+			return
 		}
 		v.SetInt(n)
 
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
 		n, err := strconv.ParseUint(s, 10, 64)
 		if err != nil || v.OverflowUint(n) {
-			panic(fmt.Sprintf("Invalid uint '%s' specified on line %d", s, d.lineNum))
+			d.saveError(&IniError{d.lineNum, d.line, "Invalid uint"})
+			return
 		}
 		v.SetUint(n)
 
 	case reflect.Float32, reflect.Float64:
 		n, err := strconv.ParseFloat(s, v.Type().Bits())
 		if err != nil || v.OverflowFloat(n) {
-			panic(fmt.Sprintf("Invalid float '%s' specified on line %d", s, d.lineNum))
+			d.saveError(&IniError{d.lineNum, d.line, "Invalid float"})
+			return
 		}
 		v.SetFloat(n)
 
@@ -253,7 +251,6 @@ func (d *decodeState) setValue(v reflect.Value, s string) {
 		d.sliceValue(v, s)
 
 	default:
-		fmt.Println("NOPE")
 		d.saveError(&IniError{d.lineNum, d.line, fmt.Sprintf("Can't set value of type %s", v.Kind())})
 	}
 
@@ -273,7 +270,8 @@ func (d *decodeState) sliceValue(v reflect.Value, s string) {
 		// Hardcoding of []int temporarily
 		n, err := strconv.ParseInt(s, 10, 64)
 		if err != nil {
-			panic(fmt.Sprintf("Invalid int '%s' specified on line %d", s, d.lineNum))
+			d.saveError(&IniError{d.lineNum, d.line, "Invalid int"})
+			return
 		}
 
 		n1 := reflect.ValueOf(n)
@@ -284,7 +282,8 @@ func (d *decodeState) sliceValue(v reflect.Value, s string) {
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
 		n, err := strconv.ParseUint(s, 10, 64)
 		if err != nil {
-			panic(fmt.Sprintf("Invalid uint '%s' specified on line %d", s, d.lineNum))
+			d.saveError(&IniError{d.lineNum, d.line, "Invalid uint"})
+			return
 		}
 
 		n1 := reflect.ValueOf(n)
@@ -295,7 +294,8 @@ func (d *decodeState) sliceValue(v reflect.Value, s string) {
 	case reflect.Float32, reflect.Float64:
 		n, err := strconv.ParseFloat(s, 64)
 		if err != nil {
-			panic(fmt.Sprintf("Invalid float32 '%s' specified on line %d", s, d.lineNum))
+			d.saveError(&IniError{d.lineNum, d.line, "Invalid float"})
+			return
 		}
 
 		n1 := reflect.ValueOf(n)
@@ -304,7 +304,6 @@ func (d *decodeState) sliceValue(v reflect.Value, s string) {
 		v.Set(reflect.Append(v, n2))
 
 	default:
-		fmt.Println("Not yet!")
 		d.saveError(&IniError{d.lineNum, d.line, fmt.Sprintf("Can't set value in array of type %s",
 			v.Type().Elem().Kind())})
 	}

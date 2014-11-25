@@ -242,16 +242,12 @@ SET OPTION NETWORK ID=53
 	}
 }
 
-func TestArray(t *testing.T) {
+func TestStringArray(t *testing.T) {
 	var d struct {
 		Playlist struct {
-			Id      int
-			Name    string
-			Titles  []string  `ini:"Add Title"`
-			Songs   []int     `ini:"Add Song"`
-			Genres  []uint    `ini:"Add Genre"`
-			Volumes []float32 `ini:"Add Volume"`
-			Videos  []bool    `ini:"Is Video"`
+			Id    int
+			Name  string
+			Songs []string `ini:"Add Song"`
 		} `ini:"[CREATE PLAYLIST]"`
 	}
 
@@ -259,16 +255,8 @@ func TestArray(t *testing.T) {
 [CREATE PLAYLIST]
 ID=349
 Name=Rock & Roll, D00d
-Add Title=Time to Run
-Add Title=W H O K I L L
-Add Song=71
-Add Song=136
-Add Genre=17
-Add Genre=31
-Add Volume=0.75
-Add Volume=0.81
-Is Video=false
-Is Video=true
+Add Song=Time to Run
+Add Song=W H O K I L L
 `)
 
 	err := Unmarshal(b, &d)
@@ -281,36 +269,156 @@ Is Video=true
 		t.Fatal("Playlist Id not set")
 	} else if d.Playlist.Name != "Rock & Roll, D00d" {
 		t.Fatal("Playlist Name not set")
-	} else if len(d.Playlist.Titles) != 2 {
-		t.Fatal("Playlist Title length is incorrect")
-	} else if d.Playlist.Titles[0] != "Time to Run" {
-		t.Fatal("Playlist Title[0] is incorrect")
-	} else if d.Playlist.Titles[1] != "W H O K I L L" {
-		t.Fatal("Playlist Title[1] is incorrect")
 	} else if len(d.Playlist.Songs) != 2 {
-		t.Fatal("Playlist Songs length is incorrect")
-	} else if d.Playlist.Songs[0] != 71 {
+		t.Fatal("Playlist Song length is incorrect")
+	} else if d.Playlist.Songs[0] != "Time to Run" {
 		t.Fatal("Playlist Songs[0] is incorrect")
-	} else if d.Playlist.Songs[1] != 136 {
+	} else if d.Playlist.Songs[1] != "W H O K I L L" {
 		t.Fatal("Playlist Songs[1] is incorrect")
-	} else if len(d.Playlist.Genres) != 2 {
-		t.Fatal("Playlist Genre length is incorrect")
-	} else if d.Playlist.Genres[0] != 17 {
-		t.Fatal("Playlist Genre[0] is incorrect")
-	} else if d.Playlist.Genres[1] != 31 {
-		t.Fatal("Playlist Genre[1] is incorrect")
-	} else if len(d.Playlist.Volumes) != 2 {
-		t.Fatal("Playlist Volume length is incorrect")
-	} else if d.Playlist.Volumes[0] != 0.75 {
-		t.Fatal("Playlist Volume[0] is incorrect")
-	} else if d.Playlist.Volumes[1] != 0.81 {
-		t.Fatal("Playlist Volume[1] is incorrect")
-	} else if len(d.Playlist.Videos) != 2 {
-		t.Fatal("Playlist Video length is incorrect")
-	} else if d.Playlist.Videos[0] != false {
-		t.Fatal("Playlist Video[0] is incorrect")
-	} else if d.Playlist.Videos[1] != true {
-		t.Fatal("Playlist Video[1] is incorrect")
+	}
+}
+
+func TestIntArray(t *testing.T) {
+	var d struct {
+		Playlist struct {
+			Id    int
+			Name  string
+			Songs []int `ini:"Add Song"`
+		} `ini:"[CREATE PLAYLIST]"`
+	}
+
+	b := []byte(`
+[CREATE PLAYLIST]
+ID=349
+Name=Rock & Roll, D00d
+Add Song=-19
+Add Song=43107
+`)
+
+	err := Unmarshal(b, &d)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if d.Playlist.Id != 349 {
+		t.Fatal("Playlist Id not set")
+	} else if d.Playlist.Name != "Rock & Roll, D00d" {
+		t.Fatal("Playlist Name not set")
+	} else if len(d.Playlist.Songs) != 2 {
+		t.Fatal("Playlist Song length is incorrect")
+	} else if d.Playlist.Songs[0] != -19 {
+		t.Fatal("Playlist Songs[0] is incorrect")
+	} else if d.Playlist.Songs[1] != 43107 {
+		t.Fatal("Playlist Title[1] is incorrect")
+	}
+}
+
+func TestUIntArray(t *testing.T) {
+	var d struct {
+		Playlist struct {
+			Id    uint
+			Name  string
+			Songs []uint `ini:"Add Song"`
+		} `ini:"[CREATE PLAYLIST]"`
+	}
+
+	b := []byte(`
+[CREATE PLAYLIST]
+ID=349
+Name=Rock & Roll, D00d
+Add Song=19
+Add Song=43107
+`)
+
+	err := Unmarshal(b, &d)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if d.Playlist.Id != 349 {
+		t.Fatal("Playlist Id not set")
+	} else if d.Playlist.Name != "Rock & Roll, D00d" {
+		t.Fatal("Playlist Name not set")
+	} else if len(d.Playlist.Songs) != 2 {
+		t.Fatal("Playlist Song length is incorrect")
+	} else if d.Playlist.Songs[0] != 19 {
+		t.Fatal("Playlist Songs[0] is incorrect")
+	} else if d.Playlist.Songs[1] != 43107 {
+		t.Fatal("Playlist Title[1] is incorrect")
+	}
+}
+
+func TestFloatArray(t *testing.T) {
+	var d struct {
+		Playlist struct {
+			Id    int
+			Name  string
+			Songs []float32 `ini:"Add Song"`
+		} `ini:"[CREATE PLAYLIST]"`
+	}
+
+	b := []byte(`
+[CREATE PLAYLIST]
+ID=349
+Name=Rock & Roll, D00d
+Add Song=1.9
+Add Song=431.7
+`)
+
+	err := Unmarshal(b, &d)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if d.Playlist.Id != 349 {
+		t.Fatal("Playlist Id not set")
+	} else if d.Playlist.Name != "Rock & Roll, D00d" {
+		t.Fatal("Playlist Name not set")
+	} else if len(d.Playlist.Songs) != 2 {
+		t.Fatal("Playlist Song length is incorrect")
+	} else if d.Playlist.Songs[0] != 1.9 {
+		t.Fatal("Playlist Songs[0] is incorrect")
+	} else if d.Playlist.Songs[1] != 431.7 {
+		t.Fatal("Playlist Title[1] is incorrect")
+	}
+}
+
+func TestBoolArray(t *testing.T) {
+	var d struct {
+		Playlist struct {
+			Id    int
+			Name  string
+			Songs []bool `ini:"Add Song"`
+		} `ini:"[CREATE PLAYLIST]"`
+	}
+
+	b := []byte(`
+[CREATE PLAYLIST]
+ID=349
+Name=Rock & Roll, D00d
+Add Song=true
+Add Song=false
+`)
+
+	err := Unmarshal(b, &d)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if d.Playlist.Id != 349 {
+		t.Fatal("Playlist Id not set")
+	} else if d.Playlist.Name != "Rock & Roll, D00d" {
+		t.Fatal("Playlist Name not set")
+	} else if len(d.Playlist.Songs) != 2 {
+		t.Fatal("Playlist Song length is incorrect")
+	} else if d.Playlist.Songs[0] != true {
+		t.Fatal("Playlist Songs[0] is incorrect")
+	} else if d.Playlist.Songs[1] != false {
+		t.Fatal("Playlist Title[1] is incorrect")
 	}
 }
 
