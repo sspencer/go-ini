@@ -339,3 +339,45 @@ Is Video=true
 		t.Fatal("Playlist Video[1] is incorrect")
 	}
 }
+
+func TestArrayStruct(t *testing.T) {
+	var d struct {
+		Device struct {
+			NumZones  int `ini:"SET OPTION ACTIVE ZONES"`
+			MaxVolume int `ini:"SET OPTION ALLOW MAX VOLUME"`
+		} `ini:"[ALTER DEVICE]"`
+
+		Channels []struct {
+			Id         int
+			Title      string
+			PlaylistId int `ini:"SET DEFAULT PLAYLIST"`
+		} `ini:"[CREATE CHANNEL]"`
+	}
+
+	b := []byte(`
+[ALTER DEVICE]
+SET OPTION ACTIVE ZONES=3
+SET OPTION ALLOW MAX VOLUME=11
+[CREATE CHANNEL]
+ID=1
+Title=Lounge
+SET DEFAULT PLAYLIST=6502
+[CREATE CHANNEL]
+ID=2
+Title=Acid House
+SET DEFAULT PLAYLIST=4004`)
+
+	err := Unmarshal(b, &d)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if d.Device.NumZones != 3 {
+		t.Fatal("NumZones is incorrect")
+	} else if d.Device.MaxVolume != 11 {
+		t.Fatal("MaxVolume is incorrect")
+	} else if len(d.Channels) != 2 {
+		t.Fatal("Incorrect number of channels")
+	}
+}
