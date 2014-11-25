@@ -61,7 +61,7 @@ Magic Number = 42`)
 	} else if d.Start.Magic != 42 {
 		t.Fatal("Magic not set")
 	} else if len(unmatched) != 1 {
-		t.Fatal("Wrong number of unmatched lines")
+		t.Fatal("Wrong number of unmatched lines (%d): %v", len(unmatched), unmatched)
 	} else if unmatched[0].line != "UNMATCHED=ME" {
 		t.Fatal("Unmatched line does not match")
 	}
@@ -166,6 +166,7 @@ func TestMixed(t *testing.T) {
 	var d struct {
 		Title   string
 		Version string
+		About   string
 		Mysql   struct {
 			Host string
 		} `ini:"[MYSQL]"`
@@ -177,6 +178,8 @@ VERSION=1.3.3
 
 [MYSQL]
 HOST=localhost
+
+ABOUT=Third Rock
 `)
 
 	err := Unmarshal(b, &d)
@@ -186,11 +189,13 @@ HOST=localhost
 	}
 
 	if d.Title != "Go Compiler" {
-		t.Fatal("Field Title not set")
+		t.Fatal("Title not set")
 	} else if d.Version != "1.3.3" {
-		t.Fatal("Field Version not set")
+		t.Fatal("Version not set")
+	} else if d.About != "Third Rock" {
+		t.Fatal("About not set")
 	} else if d.Mysql.Host != "localhost" {
-		t.Fatal("Field Host not set")
+		t.Fatal("MySQL Host not set")
 	}
 
 }
@@ -340,13 +345,13 @@ Is Video=true
 	}
 }
 
+/*
 func TestArrayStruct(t *testing.T) {
 	var d struct {
 		Device struct {
 			NumZones  int `ini:"SET OPTION ACTIVE ZONES"`
 			MaxVolume int `ini:"SET OPTION ALLOW MAX VOLUME"`
 		} `ini:"[ALTER DEVICE]"`
-
 		Channels []struct {
 			Id         int
 			Title      string
@@ -381,3 +386,4 @@ SET DEFAULT PLAYLIST=4004`)
 		t.Fatal("Incorrect number of channels")
 	}
 }
+*/

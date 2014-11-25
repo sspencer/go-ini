@@ -53,10 +53,12 @@ type sectionTag struct {
 	tag      string
 	value    reflect.Value
 	children map[string]sectionTag
+	isArray  bool
+	array    []interface{}
 }
 
 func (t sectionTag) String() string {
-	return fmt.Sprintf("<section %s>", t.tag)
+	return fmt.Sprintf("<section %s, isArray:%t>", t.tag, t.isArray)
 }
 
 func (d *decodeState) init(data []byte) *decodeState {
@@ -92,6 +94,7 @@ func (d *decodeState) generateMap(m map[string]sectionTag, v reflect.Value) {
 
 			sf := typ.Field(i)
 			f := v.Field(i)
+			kind := f.Type().Kind()
 
 			tag := sf.Tag.Get("ini")
 			if len(tag) == 0 {
@@ -99,22 +102,26 @@ func (d *decodeState) generateMap(m map[string]sectionTag, v reflect.Value) {
 			}
 			tag = strings.TrimSpace(strings.ToLower(tag))
 
-			st := sectionTag{tag, f, make(map[string]sectionTag)}
+			st := sectionTag{tag, f, make(map[string]sectionTag), kind == reflect.Slice, nil}
 
 			// some structures are just for organizing data
 			if tag != "-" {
 				m[tag] = st
 			}
 
-			if f.Type().Kind() == reflect.Struct {
+			if kind == reflect.Struct {
 				if tag == "-" {
 					d.generateMap(m, f)
 				} else {
 					// little namespacing here so property names can
 					// be the same under different sections
+					//fmt.Printf("Struct tag: %s, type: %s\n", tag, f.Type())
 					d.generateMap(st.children, f)
 				}
-			}
+			} /*else if kind == reflect.Slice {
+				fmt.Printf("Slice tag: %s, type: %s\n", tag, f.Type().Elem())
+				d.generateMap(st.children, reflect.New(f.Type().Elem()))
+			}*/
 		}
 	} else {
 		d.saveError(&IniError{d.lineNum, d.line, fmt.Sprintf("Can't map into type %s", v.Kind())})
@@ -124,34 +131,52 @@ func (d *decodeState) generateMap(m map[string]sectionTag, v reflect.Value) {
 
 func (d *decodeState) unmarshal(x interface{}) error {
 
-	var parentMap map[string]sectionTag = make(map[string]sectionTag)
+	var sectionMap map[string]sectionTag = make(map[string]sectionTag)
+	var section, nextSection sectionTag
+	var inSection, nextHasSection bool = false, false
 
-	d.generateMap(parentMap, reflect.ValueOf(x))
-
-	var parentSection sectionTag
-	var hasParent bool = false
+	d.generateMap(sectionMap, reflect.ValueOf(x))
+	//fmt.Println(sectionMap)
 
 	for d.scanner.Scan() {
 		if d.savedError != nil {
 			break
 		}
 
-		line := strings.TrimSpace(d.scanner.Text())
+		d.line = d.scanner.Text()
 		d.lineNum++
-		d.line = line
 
-		//log.Printf("Scanned (%d): %s\n", lineNum, line)
+		//fmt.Printf("Scanned (%d): %s\n", d.lineNum, d.line)
+
+		line := strings.ToLower(strings.TrimSpace(d.line))
 
 		if len(line) < 1 || line[0] == ';' || line[0] == '#' {
 			continue // skip comments
 		}
 
-		if line[0] == '[' && line[len(line)-1] == ']' {
-			parentSection, hasParent = parentMap[strings.ToLower(line)]
-			continue // in a section
+		// [Sections] could appear at any time (square brackets not required)
+		// When in a section, also look in children map
+		nextSection, nextHasSection = sectionMap[line]
+		if nextHasSection {
+			section = nextSection
+			inSection = true
+			continue
 		}
 
-		matches := strings.SplitN(line, "=", 2)
+		/*
+			if hasParent {
+				fmt.Printf("PARENT: %s\n", parentSection.tag)
+				//fmt.Printf("  CHIL: %s\n", parentSection.children)
+				fmt.Printf("  VALU: %s\n", parentSection.value)
+				if parentSection.isArray {
+					tv := reflect.New(parentSection.value.Type().Elem())
+					d.unmarshal(tv)
+					fmt.Printf("  SET IT: %s\n", tv)
+				}
+			}
+		*/
+
+		matches := strings.SplitN(d.line, "=", 2)
 		matched := false
 
 		// potential property=value
@@ -159,25 +184,32 @@ func (d *decodeState) unmarshal(x interface{}) error {
 			n := strings.ToLower(strings.TrimSpace(matches[0]))
 			s := strings.TrimSpace(matches[1])
 
-			if hasParent {
-				// "section" property
-				childSection, hasChild := parentSection.children[n]
-				if hasChild {
-					d.setValue(childSection.value, s)
+			if inSection {
+				// child property, within a section
+				childProperty, hasProp := section.children[n]
+
+				if hasProp {
+					//fmt.Println("CHILD:", childProperty)
+					d.setValue(childProperty.value, s)
+					//fmt.Printf("  Partial? %v\n", childProperty.value)
 					matched = true
 				}
-			} else {
+			}
+
+			if !matched {
 				// top level property
-				propSection, hasProp := parentMap[n]
+				topLevelProperty, hasProp := sectionMap[n]
 				if hasProp {
-					d.setValue(propSection.value, s)
+					// just encountered a top level property - switch out of section mode
+					inSection = false
 					matched = true
+					d.setValue(topLevelProperty.value, s)
 				}
 			}
 		}
 
 		if !matched {
-			d.unmatched = append(d.unmatched, Unmatched{d.lineNum, line})
+			d.unmatched = append(d.unmatched, Unmatched{d.lineNum, d.line})
 		}
 	}
 
@@ -186,7 +218,7 @@ func (d *decodeState) unmarshal(x interface{}) error {
 
 // Set Value with given string
 func (d *decodeState) setValue(v reflect.Value, s string) {
-	//log.Printf("SET(%s, %s)", v.Kind(), s)
+	//fmt.Printf("SET(%s, %s)\n", v.Kind(), s)
 
 	switch v.Kind() {
 
@@ -218,10 +250,10 @@ func (d *decodeState) setValue(v reflect.Value, s string) {
 		v.SetFloat(n)
 
 	case reflect.Slice:
-
 		d.sliceValue(v, s)
 
 	default:
+		fmt.Println("NOPE")
 		d.saveError(&IniError{d.lineNum, d.line, fmt.Sprintf("Can't set value of type %s", v.Kind())})
 	}
 
@@ -230,6 +262,7 @@ func (d *decodeState) setValue(v reflect.Value, s string) {
 func (d *decodeState) sliceValue(v reflect.Value, s string) {
 
 	switch v.Type().Elem().Kind() {
+
 	case reflect.String:
 		v.Set(reflect.Append(v, reflect.ValueOf(s)))
 
@@ -271,6 +304,7 @@ func (d *decodeState) sliceValue(v reflect.Value, s string) {
 		v.Set(reflect.Append(v, n2))
 
 	default:
+		fmt.Println("Not yet!")
 		d.saveError(&IniError{d.lineNum, d.line, fmt.Sprintf("Can't set value in array of type %s",
 			v.Type().Elem().Kind())})
 	}
