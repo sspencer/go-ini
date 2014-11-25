@@ -118,7 +118,7 @@ func (d *decodeState) generateMap(m map[string]sectionTag, v reflect.Value) {
 					d.generateMap(st.children, f)
 				}
 			} else if kind == reflect.Slice {
-				fmt.Printf("Slice tag: %s, type: %s\n", tag, f.Type().Elem())
+				//fmt.Printf("Slice tag: %s, type: %s\n", tag, f.Type().Elem())
 				d.generateMap(st.children, reflect.New(f.Type().Elem()))
 			}
 		}
