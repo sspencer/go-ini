@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"reflect"
 	"strconv"
 	"strings"
@@ -30,8 +29,21 @@ func (u Unmatched) String() string {
 	return fmt.Sprintf("%d %s", u.lineNum, u.line)
 }
 
+type IniError struct {
+	lineNum  int
+	line     string
+	iniError string
+}
+
+// conform to Error Interfacer
+func (e *IniError) Error() string {
+	return fmt.Sprintf("%s - %d: %s", e.iniError, e.lineNum, e.line)
+}
+
 // decodeState represents the state while decoding a INI value.
 type decodeState struct {
+	lineNum    int
+	line       string
 	scanner    *bufio.Scanner
 	savedError error
 	unmatched  []Unmatched
@@ -49,6 +61,8 @@ func (t sectionTag) String() string {
 
 func (d *decodeState) init(data []byte) *decodeState {
 
+	d.lineNum = 0
+	d.line = ""
 	d.scanner = bufio.NewScanner(bytes.NewReader(data))
 	d.savedError = nil
 
@@ -68,10 +82,10 @@ func (d *decodeState) saveError(err error) {
 	}
 }
 
-func generateMap(m map[string]sectionTag, v reflect.Value) {
+func (d *decodeState) generateMap(m map[string]sectionTag, v reflect.Value) {
 
 	if v.Type().Kind() == reflect.Ptr {
-		generateMap(m, v.Elem())
+		d.generateMap(m, v.Elem())
 	} else if v.Kind() == reflect.Struct {
 		typ := v.Type()
 		for i := 0; i < typ.NumField(); i++ {
@@ -94,16 +108,16 @@ func generateMap(m map[string]sectionTag, v reflect.Value) {
 
 			if f.Type().Kind() == reflect.Struct {
 				if tag == "-" {
-					generateMap(m, f)
+					d.generateMap(m, f)
 				} else {
 					// little namespacing here so property names can
 					// be the same under different sections
-					generateMap(st.children, f)
+					d.generateMap(st.children, f)
 				}
 			}
 		}
 	} else {
-		panic(fmt.Sprintf("Don't handle this type yet: %s", v.Kind()))
+		d.saveError(&IniError{d.lineNum, d.line, fmt.Sprintf("Can't map into type %s", v.Kind())})
 	}
 
 }
@@ -112,17 +126,21 @@ func (d *decodeState) unmarshal(x interface{}) error {
 
 	var parentMap map[string]sectionTag = make(map[string]sectionTag)
 
-	generateMap(parentMap, reflect.ValueOf(x))
-
-	//log.Printf("%#v\n", parentMap)
+	d.generateMap(parentMap, reflect.ValueOf(x))
 
 	var parentSection sectionTag
 	var hasParent bool = false
-	lineNum := 1
+
 	for d.scanner.Scan() {
+		if d.savedError != nil {
+			break
+		}
+
 		line := strings.TrimSpace(d.scanner.Text())
-		log.Printf("Scanned (%d): %s\n", lineNum, line)
-		lineNum++
+		d.lineNum++
+		d.line = line
+
+		//log.Printf("Scanned (%d): %s\n", lineNum, line)
 
 		if len(line) < 1 || line[0] == ';' || line[0] == '#' {
 			continue // skip comments
@@ -130,51 +148,45 @@ func (d *decodeState) unmarshal(x interface{}) error {
 
 		if line[0] == '[' && line[len(line)-1] == ']' {
 			parentSection, hasParent = parentMap[strings.ToLower(line)]
-
-			continue
+			continue // in a section
 		}
 
 		matches := strings.SplitN(line, "=", 2)
 		matched := false
+
+		// potential property=value
 		if len(matches) == 2 {
 			n := strings.ToLower(strings.TrimSpace(matches[0]))
 			s := strings.TrimSpace(matches[1])
 
 			if hasParent {
-
+				// "section" property
 				childSection, hasChild := parentSection.children[n]
 				if hasChild {
-					setValue(childSection.value, s, lineNum)
+					d.setValue(childSection.value, s)
 					matched = true
-				} // else look for wildcard??
+				}
 			} else {
+				// top level property
 				propSection, hasProp := parentMap[n]
 				if hasProp {
-					setValue(propSection.value, s, lineNum)
+					d.setValue(propSection.value, s)
 					matched = true
 				}
 			}
 		}
 
 		if !matched {
-			d.unmatched = append(d.unmatched, Unmatched{lineNum, line})
+			d.unmatched = append(d.unmatched, Unmatched{d.lineNum, line})
 		}
 	}
 
-	// temp - print out unmatch lines to verify they're being kept
-	if len(d.unmatched) > 0 {
-		log.Println("==== Unmatched Lines ====")
-		for _, line := range d.unmatched {
-			log.Println("    ", line)
-		}
-	}
-
-	return nil
+	return d.savedError
 }
 
 // Set Value with given string
-func setValue(v reflect.Value, s string, lineNum int) {
-	log.Printf("SET(%s, %s)", v.Kind(), s)
+func (d *decodeState) setValue(v reflect.Value, s string) {
+	//log.Printf("SET(%s, %s)", v.Kind(), s)
 
 	switch v.Kind() {
 
@@ -187,35 +199,35 @@ func setValue(v reflect.Value, s string, lineNum int) {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		n, err := strconv.ParseInt(s, 10, 64)
 		if err != nil || v.OverflowInt(n) {
-			panic(fmt.Sprintf("Invalid int '%s' specified on line %d", s, lineNum))
+			panic(fmt.Sprintf("Invalid int '%s' specified on line %d", s, d.lineNum))
 		}
 		v.SetInt(n)
 
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
 		n, err := strconv.ParseUint(s, 10, 64)
 		if err != nil || v.OverflowUint(n) {
-			panic(fmt.Sprintf("Invalid uint '%s' specified on line %d", s, lineNum))
+			panic(fmt.Sprintf("Invalid uint '%s' specified on line %d", s, d.lineNum))
 		}
 		v.SetUint(n)
 
 	case reflect.Float32, reflect.Float64:
 		n, err := strconv.ParseFloat(s, v.Type().Bits())
 		if err != nil || v.OverflowFloat(n) {
-			panic(fmt.Sprintf("Invalid float '%s' specified on line %d", s, lineNum))
+			panic(fmt.Sprintf("Invalid float '%s' specified on line %d", s, d.lineNum))
 		}
 		v.SetFloat(n)
 
 	case reflect.Slice:
 
-		sliceValue(v, s, lineNum)
+		d.sliceValue(v, s)
 
 	default:
-		log.Println("Can't set that kind yet!")
+		d.saveError(&IniError{d.lineNum, d.line, fmt.Sprintf("Can't set value of type %s", v.Kind())})
 	}
 
 }
 
-func sliceValue(v reflect.Value, s string, lineNum int) {
+func (d *decodeState) sliceValue(v reflect.Value, s string) {
 
 	switch v.Type().Elem().Kind() {
 	case reflect.String:
@@ -228,7 +240,7 @@ func sliceValue(v reflect.Value, s string, lineNum int) {
 		// Hardcoding of []int temporarily
 		n, err := strconv.ParseInt(s, 10, 64)
 		if err != nil {
-			panic(fmt.Sprintf("Invalid int '%s' specified on line %d", s, lineNum))
+			panic(fmt.Sprintf("Invalid int '%s' specified on line %d", s, d.lineNum))
 		}
 
 		n1 := reflect.ValueOf(n)
@@ -239,7 +251,7 @@ func sliceValue(v reflect.Value, s string, lineNum int) {
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
 		n, err := strconv.ParseUint(s, 10, 64)
 		if err != nil {
-			panic(fmt.Sprintf("Invalid uint '%s' specified on line %d", s, lineNum))
+			panic(fmt.Sprintf("Invalid uint '%s' specified on line %d", s, d.lineNum))
 		}
 
 		n1 := reflect.ValueOf(n)
@@ -250,7 +262,7 @@ func sliceValue(v reflect.Value, s string, lineNum int) {
 	case reflect.Float32, reflect.Float64:
 		n, err := strconv.ParseFloat(s, 64)
 		if err != nil {
-			panic(fmt.Sprintf("Invalid float32 '%s' specified on line %d", s, lineNum))
+			panic(fmt.Sprintf("Invalid float32 '%s' specified on line %d", s, d.lineNum))
 		}
 
 		n1 := reflect.ValueOf(n)
@@ -259,8 +271,8 @@ func sliceValue(v reflect.Value, s string, lineNum int) {
 		v.Set(reflect.Append(v, n2))
 
 	default:
-		log.Println("Random Shit!")
-
+		d.saveError(&IniError{d.lineNum, d.line, fmt.Sprintf("Can't set value in array of type %s",
+			v.Type().Elem().Kind())})
 	}
 
 }
