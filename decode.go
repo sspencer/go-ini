@@ -172,6 +172,12 @@ func (d *decodeState) unmarshal(x interface{}) error {
 			continue
 		}
 
+		// unrecognized section - exit out of current section
+		if line[0] == '[' && line[len(line)-1] == ']' {
+			inSection = false
+			continue
+		}
+
 		matches := strings.SplitN(d.line, "=", 2)
 		matched := false
 
