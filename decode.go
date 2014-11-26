@@ -118,7 +118,6 @@ func (d *decodeState) generateMap(m map[string]sectionTag, v reflect.Value) {
 					d.generateMap(st.children, f)
 				}
 			} else if kind == reflect.Slice {
-				//fmt.Printf("Slice tag: %s, type: %s\n", tag, f.Type().Elem())
 				d.generateMap(st.children, reflect.New(f.Type().Elem()))
 			}
 		}
@@ -128,11 +127,14 @@ func (d *decodeState) generateMap(m map[string]sectionTag, v reflect.Value) {
 func (d *decodeState) unmarshal(x interface{}) error {
 
 	var sectionMap map[string]sectionTag = make(map[string]sectionTag)
+	var tempMap map[string]sectionTag = make(map[string]sectionTag)
+
 	var section, nextSection sectionTag
 	var inSection, nextHasSection bool = false, false
+	var tempValue reflect.Value // "temp" is for filling in array of structs
+	var numTempValue int
 
 	d.generateMap(sectionMap, reflect.ValueOf(x))
-	//fmt.Println(sectionMap)
 
 	for d.scanner.Scan() {
 		if d.savedError != nil {
@@ -142,7 +144,7 @@ func (d *decodeState) unmarshal(x interface{}) error {
 		d.line = d.scanner.Text()
 		d.lineNum++
 
-		//fmt.Printf("Scanned (%d): %s\n", d.lineNum, d.line)
+		//fmt.Printf("%03d: %s\n", d.lineNum, d.line)
 
 		line := strings.ToLower(strings.TrimSpace(d.line))
 
@@ -154,23 +156,21 @@ func (d *decodeState) unmarshal(x interface{}) error {
 		// When in a section, also look in children map
 		nextSection, nextHasSection = sectionMap[line]
 		if nextHasSection {
+			if numTempValue > 0 && section.isArray {
+				appendValue(section.value, tempValue)
+			}
+
 			section = nextSection
 			inSection = true
+
+			if section.isArray {
+				tempValue = reflect.New(section.value.Type().Elem())
+				d.generateMap(tempMap, tempValue)
+			}
+
+			numTempValue = 0
 			continue
 		}
-
-		/*
-			if hasParent {
-				fmt.Printf("PARENT: %s\n", parentSection.tag)
-				//fmt.Printf("  CHIL: %s\n", parentSection.children)
-				fmt.Printf("  VALU: %s\n", parentSection.value)
-				if parentSection.isArray {
-					tv := reflect.New(parentSection.value.Type().Elem())
-					d.unmarshal(tv)
-					fmt.Printf("  SET IT: %s\n", tv)
-				}
-			}
-		*/
 
 		matches := strings.SplitN(d.line, "=", 2)
 		matched := false
@@ -185,9 +185,14 @@ func (d *decodeState) unmarshal(x interface{}) error {
 				childProperty, hasProp := section.children[n]
 
 				if hasProp {
-					//fmt.Println("CHILD:", childProperty)
-					d.setValue(childProperty.value, s)
-					//fmt.Printf("  Partial? %v\n", childProperty.value)
+					if section.isArray {
+						tempProperty := tempMap[n]
+						numTempValue++
+						d.setValue(tempProperty.value, s)
+					} else {
+						d.setValue(childProperty.value, s)
+					}
+
 					matched = true
 				}
 			}
@@ -209,7 +214,15 @@ func (d *decodeState) unmarshal(x interface{}) error {
 		}
 	}
 
+	if numTempValue > 0 {
+		appendValue(section.value, tempValue)
+	}
+
 	return d.savedError
+}
+
+func appendValue(arr, val reflect.Value) {
+	arr.Set(reflect.Append(arr, reflect.Indirect(val)))
 }
 
 // Set Value with given string
@@ -258,6 +271,7 @@ func (d *decodeState) setValue(v reflect.Value, s string) {
 }
 
 func (d *decodeState) sliceValue(v reflect.Value, s string) {
+	//fmt.Printf(":SLICE(%s, %s)\n", v.Kind(), s)
 
 	switch v.Type().Elem().Kind() {
 

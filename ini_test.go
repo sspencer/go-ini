@@ -1,7 +1,6 @@
 package ini
 
 import (
-	//	"log"
 	"bytes"
 	"testing"
 )
@@ -422,7 +421,6 @@ Add Song=false
 	}
 }
 
-/*
 func TestArrayStruct(t *testing.T) {
 	var d struct {
 		Device struct {
@@ -430,10 +428,13 @@ func TestArrayStruct(t *testing.T) {
 			MaxVolume int `ini:"SET OPTION ALLOW MAX VOLUME"`
 		} `ini:"[ALTER DEVICE]"`
 		Channels []struct {
-			Id         int
 			Title      string
 			PlaylistId int `ini:"SET DEFAULT PLAYLIST"`
 		} `ini:"[CREATE CHANNEL]"`
+		Zones []struct {
+			Volume  []float32 `ini:"SET VOLUME"`
+			Channel int       `ini:"SET DEFAULT CHANNEL"`
+		} `ini:"[CREATE ZONE]"`
 	}
 
 	b := []byte(`
@@ -442,14 +443,22 @@ SET OPTION ACTIVE ZONES=3
 SET OPTION ALLOW MAX VOLUME=11
 
 [CREATE CHANNEL]
-ID=1
-Title=Lounge
+TITLE=Lounge
 SET DEFAULT PLAYLIST=6502
 
 [CREATE CHANNEL]
-ID=2
-Title=Acid House
-SET DEFAULT PLAYLIST=4004`)
+TITLE=Acid House
+SET DEFAULT PLAYLIST=4004
+
+[CREATE ZONE]
+SET VOLUME=0.65
+SET DEFAULT CHANNEL=12
+
+[CREATE ZONE]
+SET VOLUME=0.18
+SET VOLUME=0.55
+SET DEFAULT CHANNEL=19
+`)
 
 	err := Unmarshal(b, &d)
 
@@ -462,7 +471,30 @@ SET DEFAULT PLAYLIST=4004`)
 	} else if d.Device.MaxVolume != 11 {
 		t.Fatal("MaxVolume is incorrect")
 	} else if len(d.Channels) != 2 {
-		t.Fatal("Incorrect number of channels")
+		t.Fatal("Incorrect number of channels:", len(d.Channels))
+	} else if d.Channels[0].Title != "Lounge" {
+		t.Fatal("Channels[0] Title is incorrect")
+	} else if d.Channels[0].PlaylistId != 6502 {
+		t.Fatal("Channels[0] PlaylistId is incorrect")
+	} else if d.Channels[1].Title != "Acid House" {
+		t.Fatal("Channels[1] Title is incorrect")
+	} else if d.Channels[1].PlaylistId != 4004 {
+		t.Fatal("Channels[1] PlaylistId is incorrect")
+	} else if len(d.Zones) != 2 {
+		t.Fatal("Incorrect number of Zones:", len(d.Zones))
+	} else if len(d.Zones[0].Volume) != 1 {
+		t.Fatal("Zones[0] Incorrect number of Volumes:", len(d.Zones[1].Volume))
+	} else if d.Zones[0].Volume[0] != 0.65 {
+		t.Fatal("Zones[0] Volume is incorrect")
+	} else if d.Zones[0].Channel != 12 {
+		t.Fatal("Zones[0] Channel is incorrect")
+	} else if len(d.Zones[1].Volume) != 2 {
+		t.Fatal("Zones[1] Incorrect number of Volumes:", len(d.Zones[1].Volume))
+	} else if d.Zones[1].Volume[0] != 0.18 {
+		t.Fatal("Zones[1] Volume[0] is incorrect")
+	} else if d.Zones[1].Volume[1] != 0.55 {
+		t.Fatal("Zones[1] Volume[1] is incorrect")
+	} else if d.Zones[1].Channel != 19 {
+		t.Fatal("Zones[1] Channel is incorrect")
 	}
 }
-*/
