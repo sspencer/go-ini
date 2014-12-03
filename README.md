@@ -33,10 +33,81 @@ With code like this:
     err := ini.Unmarshal(b, &config)
 
 
-Current Status
+Advanced Types
 ==============
 
-Structs with scalar values in [SECTIONS] now parsed.
+Over the years, INI files have grown from simple `name=value` lists of properties to files that support arrays and arrays of structures.  For example, to support playlists a music config file may look like this:
+
+    [CREATE SONG]
+    SongId=21348
+    Title=Long Way to Go
+    Artist=The Coach
+
+    [CREATE SONG]
+    SongId=9855
+    Title=The Falcon Lead
+    Artist=It Wasn't Safe
+
+    [CREATE PLAYLIST]
+    PlaylistId=438432
+    Title=Acid Jazz
+    Song=21348
+    Song=482
+    Song=9855
+
+    [CREATE PLAYLIST]
+    PlaylistId=2585
+    Title=Lounge
+    Song=7558
+    Song=25828
+
+With GO-INI, parsing is as simple as defining the structure and unmarshalling it.
+
+    package main
+
+    import (
+        "encoding/json"
+        "github.com/sspencer/go-ini"
+        "io/ioutil"
+        "log"
+        "os"
+    )
+
+    type TunePlayer struct {
+        Songs []struct {
+            SongId int
+            Title string
+            Artist string
+        } `ini:"[CREATE SONG]"`
+
+        Playlists []struct {
+            PlaylistId int
+            Title string
+            SongIds []int `ini:"Song"`
+        } `ini:[CREATE PLAYLIST]`
+    }
+
+    func main() {
+        var player TunePlayer
+
+        content, err := ioutil.ReadFile("./tunes.ini")
+        if err != nil {
+            log.Fatal(err)
+        }
+
+        err = ini.Unmarshal(content, &player)
+        if err != nil {
+            log.Fatal(err)
+        }
+
+        // Output same struct as JSON to verify parsing worked
+        enc := json.NewEncoder(os.Stdout)
+        if err := enc.Encode(&player); err != nil {
+            log.Println(err)
+        }
+    }
+
+
 
 
 
