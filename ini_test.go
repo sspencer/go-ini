@@ -5,6 +5,7 @@ import (
 	"testing"
 )
 
+
 func TestSimple(t *testing.T) {
 	var d struct {
 		Start struct {
@@ -496,5 +497,47 @@ SET DEFAULT CHANNEL=19
 		t.Fatal("Zones[1] Volume[1] is incorrect")
 	} else if d.Zones[1].Channel != 19 {
 		t.Fatal("Zones[1] Channel is incorrect")
+	}
+}
+
+func TestStructsInStructs(t *testing.T) {
+	var d struct {
+		Tracks []struct {
+			Id      int
+			Title   string
+			Sources []struct {
+				Id      string
+				BitRate int
+			} `ini:"[CREATE AUDIO SOURCE]"`
+		} `ini:"[CREATE TRACK]"`
+	}
+
+	b := []byte(`
+[CREATE TRACK]
+ID=82
+Title=Some Song
+
+[CREATE AUDIO SOURCE]
+ID=82
+BitRate=64
+
+[CREATE AUDIO SOURCE]
+ID=82
+BitRate=128
+`)
+	err := Unmarshal(b, &d)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(d.Tracks) != 1 {
+		t.Fatal("Incorrect number of tracks,", len(d.Tracks))
+	} else if len(d.Tracks[0].Sources) != 2 {
+		t.Fatal("Incorrect number of sources,", len(d.Tracks[0].Sources))
+	} else if d.Tracks[0].Sources[0].BitRate != 64 {
+		t.Fatal("Incorrect bitrate for source[0],", d.Tracks[0].Sources[0].BitRate)
+	} else if d.Tracks[0].Sources[1].BitRate != 128 {
+		t.Fatal("Incorrect bitrate for source[1],", d.Tracks[0].Sources[1].BitRate)
 	}
 }

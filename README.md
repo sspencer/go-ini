@@ -37,3 +37,36 @@ Current Status
 ==============
 
 Structs with scalar values in [SECTIONS] now parsed.
+
+
+
+Todo
+=====
+
+Need to parse inner array of structs
+
+    struct {
+        Playlists []struct {
+            Id int
+            Title string
+            Programs []struct {
+                Id int
+                Mix string
+                Separation int
+            } `ini:"Play Program"`
+        } `ini:"[CREATE PLAYLIST]"`
+    }
+
+    [CREATE PLAYLIST]
+    ID=6524
+    Title=Pop
+    Start Schedule
+
+    Play Program
+    ID=391
+    Mix=RAND
+
+    Play Program
+    ID=3912
+    Separation=10
+    End Schedule
