@@ -7,13 +7,13 @@ func NewStack() *Stack {
 
 // Stack is a basic LIFO stack that resizes as needed.
 type Stack struct {
-	nodes []interface{}
+	items []interface{}
 	count int
 }
 
 // Push adds an iterm to the top of the stack
 func (s *Stack) Push(item interface{}) {
-	s.nodes = append(s.nodes[:s.count], item)
+	s.items = append(s.items[:s.count], item)
 	s.count++
 }
 
@@ -24,7 +24,7 @@ func (s *Stack) Pop() interface{} {
 	}
 
 	s.count--
-	return s.nodes[s.count]
+	return s.items[s.count]
 }
 
 // Peek returns item at top of stack without removing it
@@ -33,7 +33,7 @@ func (s *Stack) Peek() interface{} {
 		return nil
 	}
 
-	return s.nodes[s.count-1]
+	return s.items[s.count-1]
 }
 
 // Empty returns true when stack is empty, false otherwise
