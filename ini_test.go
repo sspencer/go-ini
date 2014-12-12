@@ -132,6 +132,7 @@ func TestTwoSections(t *testing.T) {
 	var d struct {
 		Mysql struct {
 			Host string
+			Port int
 		} `ini:"[MYSQL]"`
 
 		PdoMysql struct {
@@ -142,9 +143,11 @@ func TestTwoSections(t *testing.T) {
 	b := []byte(`
 [MYSQL]
 HOST=mysql:localhost
-
 [PDOMYSQL]
 HOST=pdo:127.0.0.1
+SOCKET=/tmp/mysql.sock
+[MYSQL]
+PORT=3303
 `)
 
 	err := Unmarshal(b, &d)
@@ -154,49 +157,12 @@ HOST=pdo:127.0.0.1
 	}
 
 	if d.Mysql.Host != "mysql:localhost" {
-		t.Fatal("Field Mysql Host not set")
+		t.Fatal("Mysql Host not set")
+	} else if d.Mysql.Port != 3303 {
+		t.Fatal("Mysql Port not set")
 	} else if d.PdoMysql.Host != "pdo:127.0.0.1" {
-		t.Fatal("Field Pdo Host not set")
+		t.Fatal("PDO Host not set")
 	}
-}
-
-func TestMixed(t *testing.T) {
-
-	var d struct {
-		Title   string
-		Version string
-		About   string
-		Mysql   struct {
-			Host string
-		} `ini:"[MYSQL]"`
-	}
-
-	b := []byte(`
-TITLE=Go Compiler
-VERSION=1.3.3
-
-[MYSQL]
-HOST=localhost
-
-ABOUT=Third Rock
-`)
-
-	err := Unmarshal(b, &d)
-
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if d.Title != "Go Compiler" {
-		t.Fatal("Title not set")
-	} else if d.Version != "1.3.3" {
-		t.Fatal("Version not set")
-	} else if d.About != "Third Rock" {
-		t.Fatal("About not set")
-	} else if d.Mysql.Host != "localhost" {
-		t.Fatal("MySQL Host not set")
-	}
-
 }
 
 func TestDeep(t *testing.T) {
@@ -421,6 +387,7 @@ Add Song=false
 	}
 }
 
+/*
 func TestArrayStruct(t *testing.T) {
 	var d struct {
 		Device struct {
@@ -498,8 +465,8 @@ SET DEFAULT CHANNEL=19
 		t.Fatal("Zones[1] Channel is incorrect")
 	}
 }
+*/
 
-/*
 func TestStructsInStructs(t *testing.T) {
 	var d struct {
 		Tracks []struct {
@@ -541,4 +508,3 @@ BitRate=128
 		t.Fatal("Incorrect bitrate for source[1],", d.Tracks[0].Sources[1].BitRate)
 	}
 }
-*/

@@ -12,36 +12,15 @@ import (
 	"strings"
 )
 
-// Unmarshal parses the INI-encoded data and stores the result
-// in the value pointed to by v.
-func Unmarshal(data []byte, v interface{}) error {
-	var d decodeState
-	d.init(data)
-	return d.unmarshal(v)
-}
-
 type Unmatched struct {
 	lineNum int
 	line    string
 }
 
-func (u Unmatched) String() string {
-	return fmt.Sprintf("%d %s", u.lineNum, u.line)
-}
-
 type IniError struct {
-	lineNum  int
-	line     string
-	iniError string
-}
-
-// conform to Error Interfacer
-func (e *IniError) Error() string {
-	if e.lineNum > 0 {
-		return fmt.Sprintf("%s on line %d: \"%s\"", e.iniError, e.lineNum, e.line)
-	} else {
-		return e.iniError
-	}
+	lineNum int
+	line    string
+	error   string
 }
 
 // decodeState represents the state while decoding a INI value.
@@ -53,18 +32,103 @@ type decodeState struct {
 	unmatched  []Unmatched
 }
 
-type sectionTag struct {
+type property struct {
 	tag      string
 	value    reflect.Value
-	children map[string]sectionTag
+	children propertyMap
 	isArray  bool
-	array    []interface{}
+	//array         []interface{}
+	isInitialized bool
 }
 
-func (t sectionTag) String() string {
-	return fmt.Sprintf("<section %s, isArray:%t>", t.tag, t.isArray)
+type propertyMap map[string]property
+
+//------------------------------------------------------------------
+
+// NewStack returns a new stack.
+func NewPropMapStack() *PropMapStack {
+	return &PropMapStack{}
 }
 
+// Stack is a basic LIFO stack that resizes as needed.
+type PropMapStack struct {
+	items []propertyMap
+	count int
+}
+
+// Push adds an iterm to the top of the stack
+func (s *PropMapStack) Push(item propertyMap) {
+	s.items = append(s.items[:s.count], item)
+	s.count++
+}
+
+// Pop removes the top item (LIFO) from the stack
+func (s *PropMapStack) Pop() propertyMap {
+	if s.count == 0 {
+		return nil
+	}
+
+	s.count--
+	return s.items[s.count]
+}
+
+// Peek returns item at top of stack without removing it
+func (s *PropMapStack) Peek() propertyMap {
+	if s.count == 0 {
+		return nil
+	}
+
+	return s.items[s.count-1]
+}
+
+// Empty returns true when stack is empty, false otherwise
+func (s *PropMapStack) Empty() bool {
+	return s.count == 0
+}
+
+// Size returns the number of items in the stack
+func (s *PropMapStack) Size() int {
+	return s.count
+}
+
+/*
+ * Unmarshal parses the INI-encoded data and stores the result
+ * in the value pointed to by v.
+ */
+func Unmarshal(data []byte, v interface{}) error {
+	var d decodeState
+	d.init(data)
+	return d.unmarshal(v)
+}
+
+/*
+ * String interfacer for Unmatched
+ */
+func (u Unmatched) String() string {
+	return fmt.Sprintf("%d %s", u.lineNum, u.line)
+}
+
+/*
+ * Conform to Error Interfacer
+ */
+func (e *IniError) Error() string {
+	if e.lineNum > 0 {
+		return fmt.Sprintf("%s on line %d: \"%s\"", e.error, e.lineNum, e.line)
+	} else {
+		return e.error
+	}
+}
+
+/*
+ * Stringer interface for property
+ */
+func (p property) String() string {
+	return fmt.Sprintf("<property %s, isArray:%t>", p.tag, p.isArray)
+}
+
+/*
+ * Convenience function to prep for decoding byte array.
+ */
 func (d *decodeState) init(data []byte) *decodeState {
 
 	d.lineNum = 0
@@ -75,15 +139,21 @@ func (d *decodeState) init(data []byte) *decodeState {
 	return d
 }
 
-// saveError saves the first err it is called with,
-// for reporting at the end of the unmarshal.
+/*
+ * saveError saves the first err it is called with,
+ * for reporting at the end of the unmarshal.
+ */
 func (d *decodeState) saveError(err error) {
 	if d.savedError == nil {
 		d.savedError = err
 	}
 }
 
-func (d *decodeState) generateMap(m map[string]sectionTag, v reflect.Value) {
+/*
+ * Recursive function to map data types in the describing structs
+ * to string markers (tags) in the INI file.
+ */
+func (d *decodeState) generateMap(m propertyMap, v reflect.Value) {
 
 	if v.Type().Kind() == reflect.Ptr {
 		d.generateMap(m, v.Elem())
@@ -101,7 +171,7 @@ func (d *decodeState) generateMap(m map[string]sectionTag, v reflect.Value) {
 			}
 			tag = strings.TrimSpace(strings.ToLower(tag))
 
-			st := sectionTag{tag, f, make(map[string]sectionTag), kind == reflect.Slice, nil}
+			st := property{tag, f, make(propertyMap), kind == reflect.Slice, true}
 
 			// some structures are just for organizing data
 			if tag != "-" {
@@ -124,12 +194,113 @@ func (d *decodeState) generateMap(m map[string]sectionTag, v reflect.Value) {
 	}
 }
 
+/*
+ * Iterates line-by-line through INI file setting values into a struct.
+ */
 func (d *decodeState) unmarshal(x interface{}) error {
 
-	var sectionMap map[string]sectionTag = make(map[string]sectionTag)
-	var tempMap map[string]sectionTag = make(map[string]sectionTag)
+	var topMap propertyMap
+	topMap = make(propertyMap)
 
-	var section, nextSection sectionTag
+	d.generateMap(topMap, reflect.ValueOf(x))
+
+	propStack := NewPropMapStack()
+	propStack.Push(topMap)
+
+	// for every line in file
+	for d.scanner.Scan() {
+
+		if d.savedError != nil {
+			break // breaks on first error
+		}
+
+		d.line = d.scanner.Text()
+		d.lineNum++
+
+		fmt.Printf("%03d: %s\n", d.lineNum, d.line)
+
+		line := strings.TrimSpace(d.line)
+
+		if len(line) < 1 || line[0] == ';' || line[0] == '#' {
+			continue // skip comments
+		}
+
+		// Two types of lines:
+		//   1. NAME=VALUE   (at least one equal sign - breaks on first)
+		//   2. [HEADER]     (no equals sign, square brackets NOT required)
+		matches := strings.SplitN(line, "=", 2)
+		matched := false
+		pn := ""
+		pv := ""
+
+		if len(matches) == 2 {
+			// NAME=VALUE
+			pn = strings.ToLower(strings.TrimSpace(matches[0]))
+			pv = strings.TrimSpace(matches[1])
+			prop := propStack.Peek()[pn]
+
+			if prop.isInitialized {
+				if prop.isArray {
+					fmt.Println("  IS ARRAY")
+					value := reflect.New(prop.value.Type().Elem())
+					d.setValue(reflect.Indirect(value), pv)
+					appendValue(prop.value, value)
+
+				} else {
+					fmt.Println("  IS SCALAR")
+					d.setValue(prop.value, pv)
+				}
+
+				matched = true
+			}
+
+			// What if property is umatched - keep popping the stack
+			// until a potential map is found or stay within current section?
+			// Think answer is pop.
+			// NOPE
+			// Section could have unmatched name=value if user doesn't
+			// care about certain values - only stack crawling happens
+			// during numMatches==1 time?
+			// This means if there is > 1 section, there needs to be
+			// section breaks for everything
+
+		} else {
+			// [Header] section
+			pn = strings.ToLower(strings.TrimSpace(matches[0]))
+
+			for propStack.Size() > 0 {
+				prop := propStack.Peek()[pn]
+				if prop.isInitialized {
+					fmt.Println("  | IS INIT")
+					propStack.Push(prop.children)
+					matched = true
+					break
+				} else if propStack.Size() > 1 {
+					fmt.Println("  | IS POP")
+					_ = propStack.Pop()
+				} else {
+					fmt.Println("  | IS BREAK")
+					break
+				}
+			}
+		}
+
+		if !matched {
+			d.unmatched = append(d.unmatched, Unmatched{d.lineNum, d.line})
+		}
+	}
+
+	fmt.Println("Unmatched:", d.unmatched)
+
+	return d.savedError
+}
+
+func (d *decodeState) unmarshal2(x interface{}) error {
+
+	var sectionMap propertyMap = make(propertyMap)
+	var tempMap propertyMap = make(propertyMap)
+
+	var section, nextSection property
 	var inSection, nextHasSection bool = false, false
 	var tempValue reflect.Value // "temp" is for filling in array of structs
 	var numTempValue int
@@ -233,7 +404,7 @@ func appendValue(arr, val reflect.Value) {
 
 // Set Value with given string
 func (d *decodeState) setValue(v reflect.Value, s string) {
-	//fmt.Printf("SET(%s, %s)\n", v.Kind(), s)
+	//fmt.Printf("SET(kind:%s, %s)\n", v.Kind(), s)
 
 	switch v.Kind() {
 
