@@ -217,8 +217,6 @@ func (d *decodeState) unmarshal(x interface{}) error {
 		d.line = d.scanner.Text()
 		d.lineNum++
 
-		fmt.Printf("%03d: %s\n", d.lineNum, d.line)
-
 		line := strings.TrimSpace(d.line)
 
 		if len(line) < 1 || line[0] == ';' || line[0] == '#' {
@@ -241,13 +239,11 @@ func (d *decodeState) unmarshal(x interface{}) error {
 
 			if prop.isInitialized {
 				if prop.isArray {
-					fmt.Println("  IS ARRAY")
 					value := reflect.New(prop.value.Type().Elem())
 					d.setValue(reflect.Indirect(value), pv)
 					appendValue(prop.value, value)
 
 				} else {
-					fmt.Println("  IS SCALAR")
 					d.setValue(prop.value, pv)
 				}
 
@@ -271,15 +267,12 @@ func (d *decodeState) unmarshal(x interface{}) error {
 			for propStack.Size() > 0 {
 				prop := propStack.Peek()[pn]
 				if prop.isInitialized {
-					fmt.Println("  | IS INIT")
 					propStack.Push(prop.children)
 					matched = true
 					break
 				} else if propStack.Size() > 1 {
-					fmt.Println("  | IS POP")
 					_ = propStack.Pop()
 				} else {
-					fmt.Println("  | IS BREAK")
 					break
 				}
 			}
@@ -289,8 +282,6 @@ func (d *decodeState) unmarshal(x interface{}) error {
 			d.unmatched = append(d.unmatched, Unmatched{d.lineNum, d.line})
 		}
 	}
-
-	fmt.Println("Unmatched:", d.unmatched)
 
 	return d.savedError
 }
